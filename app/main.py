@@ -30,7 +30,7 @@ dynamodb = boto3.resource(
 )
 
 
-cities_table = dynamodb.Table('Cities')
+cities_table = dynamodb.Table('AirportsTable')
 
 templates = Jinja2Templates(directory="E:/Fly_searcher/app/templates")
 
@@ -39,33 +39,6 @@ async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
-# @app.get("/autocomplete", response_class=JSONResponse)
-# async def autocomplete(query: str = Query(..., min_length=1)):
-#     try:
-#         response = cities_table.scan()
-#         cities = response.get('Items', [])
-        
-#         lower_query = query.lower()
-#         max_distance = 2
-
-#         scored_cities = []
-
-#         for city in cities:
-#             city_name = city['cityName'].lower()
-#             distance = Levenshtein.distance(lower_query, city_name)
-#             if city_name.startswith(lower_query) or distance <= max_distance:
-#                 scored_cities.append({
-#                     "cityName": city['cityName'],
-#                     "cityCode": city['cityCode'],
-#                     "score": distance
-#                 })
-
-#         scored_cities.sort(key=lambda x: x['score'])
-
-
-#         return JSONResponse(content=list(scored_cities))
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
 @app.get("/autocomplete", response_class=JSONResponse)
 async def autocomplete(query: str = Query(..., min_length=1)):
     try:
@@ -78,16 +51,15 @@ async def autocomplete(query: str = Query(..., min_length=1)):
         scored_cities = []
 
         for city in cities:
-            city_name = city['cityName'].lower()
+            city_name = city['City'].lower()
             distance = Levenshtein.distance(lower_query, city_name)
 
             # Match based on city name
             if city_name.startswith(lower_query) or distance <= max_distance:
                 scored_city = {
-                    "cityName": city['cityName'],
-                    "cityCode": city['cityCode'],
+                    "cityName": city['City'],
                     "score": distance,
-                    "airports": city.get('airports', [])
+                    "airports": city.get('Airports', [])
                 }
                 scored_cities.append(scored_city)
 
@@ -96,14 +68,19 @@ async def autocomplete(query: str = Query(..., min_length=1)):
 
         # Return the list of cities with their associated airports
         return JSONResponse(content=scored_cities)
+    except KeyError as e:
+        print(f"KeyError: {e}")  # Debugging line
+        raise HTTPException(status_code=500, detail=f"KeyError: {e}")
     except Exception as e:
+        print(f"Exception: {e}")  # Debugging line
         raise HTTPException(status_code=500, detail=str(e))
 
 
 
 
-@app.post("/search", response_class=JSONResponse)
+@app.post("/search", response_class=HTMLResponse)
 async def search_flights(
+    request: Request,
     from_city_code: str = Form(...),
     to_city_code: str = Form(...),
     departure_date: str = Form(...)
@@ -111,15 +88,18 @@ async def search_flights(
     try:
         # Запрос к Amadeus API с использованием кодов городов
         response = amadeus.shopping.flight_offers_search.get(
-            originLocationCode=from_city_code,
+            originLocationCode=from_city_code,                             
             destinationLocationCode=to_city_code,
             departureDate=departure_date,
-            adults=1
+            adults=1,
+            nonStop=True
         )
         
-        return JSONResponse(content=response.data)
+        # Передача данных в шаблон для отображения
+        flight_data = response.data
+        return templates.TemplateResponse("results.html", {"request": request, "flights": flight_data})
+
     except ResponseError as error:
         return JSONResponse(status_code=500, content={"error": str(error)})
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
-

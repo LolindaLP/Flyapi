@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Search Results</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 800px;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .flight-offer {
+            border-bottom: 1px solid #ddd;
+            padding: 15px 0;
+        }
+
+        .flight-offer:last-child {
+            border-bottom: none;
+        }
+
+        .segment {
+            margin-bottom: 10px;
+        }
+
+        .price {
+            font-size: 20px;
+            font-weight: bold;
+            color: #00796b;
+            margin-top: 10px;
+        }
+
+        .book-button {
+            background-color: #00796b;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .book-button:hover {
+            background-color: #005a4a;
+        }
+    </style>
+</head>
+<body>
+    <h1>Found Flights</h1>
+    <div class="container">
+        {% if flights %}
+            {% for flight in flights %}
+                <div class="flight-offer">
+                    <h2>Flight Offer ID: {{ flight.id }}</h2>
+                    {% for itinerary in flight.itineraries %}
+                        {% for segment in itinerary.segments %}
+                            <div class="segment">
+                                <div><strong>Departure:</strong> {{ segment.departure.iataCode }} at {{ segment.departure.at | replace('T', ' ') }}</div>
+                                <div><strong>Arrival:</strong> {{ segment.arrival.iataCode }} at {{ segment.arrival.at | replace('T', ' ') }}</div>
+                                <div><strong>Carrier:</strong> {{ segment.carrierCode }} {{ segment.number }}</div>
+                                <div><strong>Duration:</strong> {{ segment.duration | replace('PT', '') | lower }}</div>
+                            </div>
+                        {% endfor %}
+                        <hr>
+                    {% endfor %}
+                    <div class="price">Total Price: {{ flight.price.currency }} {{ flight.price.grandTotal }}</div>
+                    <button class="book-button">Book Now</button>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>No flights found.</p>
+        {% endif %}
+    </div>
+</body>
+</html>

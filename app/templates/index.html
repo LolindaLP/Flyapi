@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Search</title>
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #e0f7fa;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background-color: #ffffff;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+            max-width: 450px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 25px;
+            color: #00796b;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            position: relative;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 15px;
+            margin-bottom: 8px;
+            color: #00796b;
+            font-weight: 500;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-sizing: border-box;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #ddd;
+            box-shadow: none;
+        }
+
+        .input-group input[type="date"] {
+            padding: 11px;
+        }
+
+        .autocomplete-suggestions {
+            border: none;
+            background-color: #ffffff;
+            max-height: 180px;
+            overflow-y: auto;
+            position: absolute;
+            width: 100%;
+            z-index: 1000;
+            border-radius: 0 0 6px 6px;
+            box-sizing: border-box;
+            box-shadow: none;
+        }
+
+        .autocomplete-suggestion {
+            padding: 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #e0f2f1;
+        }
+
+        .autocomplete-suggestion:last-child {
+            border-bottom: none;
+        }
+
+        .autocomplete-suggestion:hover {
+            background-color: #e0f7fa;
+        }
+
+        .search-button {
+            width: 100%;
+            padding: 16px;
+            font-size: 18px;
+            background-color: #00796b;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .search-button:hover {
+            background-color: #004d40;
+        }
+
+        .error-message {
+            color: red;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Search for Flights</h1>
+        <form method="post" action="/search" onsubmit="return validateForm()">
+            <div class="input-group">
+                <label for="from-city">From</label>
+                <input type="text" id="from-city" placeholder="Enter departure city" onkeyup="fetchCities('from')" autocomplete="off">
+                <input type="hidden" id="from-city-code" name="from_city_code">
+                <div id="from-suggestions" class="autocomplete-suggestions"></div>
+            </div>
+
+            <div class="input-group">
+                <label for="to-city">To</label>
+                <input type="text" id="to-city" placeholder="Enter destination city" onkeyup="fetchCities('to')" autocomplete="off">
+                <input type="hidden" id="to-city-code" name="to_city_code">
+                <div id="to-suggestions" class="autocomplete-suggestions"></div>
+            </div>
+
+            <div class="input-group">
+                <label for="departure-date">Departure Date</label>
+                <input type="date" id="departure-date" name="departure_date">
+            </div>
+
+            <button type="submit" class="search-button">Search</button>
+            <div id="error-message" class="error-message"></div>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('departure-date').setAttribute('min', today);
+        });
+
+        async function fetchCities(field) {
+            const query = document.getElementById(field + "-city").value;
+            if (query.length < 1) {
+                document.getElementById(field + "-suggestions").innerHTML = "";
+                return;
+            }
+
+            const response = await fetch(`/autocomplete?query=${encodeURIComponent(query)}`);
+            const cities = await response.json();
+
+            const suggestions = document.getElementById(field + "-suggestions");
+            suggestions.innerHTML = "";
+
+            cities.forEach(city => {
+                const cityItem = document.createElement("div");
+                cityItem.classList.add("autocomplete-suggestion");
+                cityItem.textContent = `${city.cityName} (${city.cityCode})`;
+
+                cityItem.onclick = () => {
+                    document.getElementById(field + "-city").value = city.cityName;
+                    document.getElementById(field + "-city-code").value = city.cityCode;
+                    suggestions.innerHTML = "";
+                };
+
+                suggestions.appendChild(cityItem);
+
+                if (city.airports && city.airports.length > 0) {
+                    city.airports.forEach(airport => {
+                        const airportItem = document.createElement("div");
+                        airportItem.classList.add("autocomplete-suggestion");
+                        airportItem.style.marginLeft = "20px";
+                        airportItem.textContent = `${airport.airportName} (${airport.airportCode})`;
+
+                        airportItem.onclick = () => {
+                            document.getElementById(field + "-city").value = `${city.cityName} - ${airport.airportName}`;
+                            document.getElementById(field + "-city-code").value = airport.airportCode;
+                            suggestions.innerHTML = "";
+                        };
+
+                        suggestions.appendChild(airportItem);
+                    });
+                }
+            });
+        }
+
+        function validateForm() {
+            const fromCity = document.getElementById('from-city').value;
+            const toCity = document.getElementById('to-city').value;
+            const departureDate = document.getElementById('departure-date').value;
+            const errorMessage = document.getElementById('error-message');
+
+            errorMessage.textContent = '';
+
+            if (!fromCity || !toCity || !departureDate) {
+                errorMessage.textContent = 'Please fill in all the fields before searching.';
+                return false;
+            }
+
+            return true;
+        }
+    </script>
+</body>
+</html>
